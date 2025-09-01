@@ -8,6 +8,8 @@ import (
 	"os"
 )
 
+// echo -n "00000020004b00000000000700096b61666b612d636c69000204666f6f0000000064ff00" | xxd -r -p | nc localhost 9092 | hexdump -C
+
 func main() {
 	fmt.Println("Logs from your program will appear here!")
 
@@ -57,43 +59,66 @@ func handleConnection(conn net.Conn) {
 		fmt.Printf("Parsed request: APIKey=%d, Version=%d, CorrelationID=%d\n",
 			minimalReq.RequestAPIKey, minimalReq.RequestAPIVersion, minimalReq.CorrelationID)
 
-		response := Response{
-			MessageSize:   33, // Will be calculated properly in serialization
-			CorrelationID: minimalReq.CorrelationID,
-			ErrorCode:     0,
-			ArrayLength:   4, // 3 API versions + 1
-			APIVersions: []APIVersion{
-				{APIKey: 1, MinVersion: 0, MaxVersion: 17, TagBuffer: 0},
-				{APIKey: 18, MinVersion: 0, MaxVersion: 4, TagBuffer: 0},
-				{APIKey: 75, MinVersion: 0, MaxVersion: 0, TagBuffer: 0},
-			},
-			ThrottleTime: 0,
-			TagBuffer:    0,
-		}
+		fmt.Printf("%d %d %d\n", minimalReq.RequestAPIKey, ApiVersionAPIKEY, DescribeTopicPartitionsAPIKEY)
 
 		switch minimalReq.RequestAPIKey {
 		case ApiVersionAPIKEY:
-			handleAPIRequest(minimalReq, &response)
+			response := handleAPIRequest(minimalReq)
+			responseBytes := serializeResponse(response)
+			conn.Write(responseBytes)
+
 		case DescribeTopicPartitionsAPIKEY:
-			handleDescribeRequest(minimalReq, &response)
+			fmt.Println("DescribeTopicPartitionsAPIKEY")
+			response := handleDescribeRequest(buff, n)
+			responseBytes := serializeDescribeTopicPartitionsResponse(response)
+			fmt.Printf("Sending response of %d bytes\n", len(responseBytes))
+			conn.Write(responseBytes)
+
 		default:
 			// response = handleDefaultRequest(minimalReq);
 		}
 
-		responseBytes := serializeResponse(response)
-		conn.Write(responseBytes)
 	}
 }
 
-func handleDescribeRequest(minimalReq *MinimalRequest, response *Response) {
+func handleDescribeRequest(buff []byte, n int) *DescribeTopicPartitionsResponse {
+	req, err := deserializeDescribeTopicPartitionsRequest(buff[:n])
+	if err != nil {
+		fmt.Println("Error deserializing request:", err)
+		os.Exit(1)
+	}
 
+	fmt.Printf("Parsed DescribeTopicPartitions request: CorrelationID=%d, Topics=%d\n",
+		req.CorrelationID, len(req.Topics))
+
+	// Create response with unknown topic error
+	response := createUnknownTopicResponse(req)
+
+	return response
 }
 
-func handleAPIRequest(minimalReq *MinimalRequest, response *Response) {
+func handleAPIRequest(minimalReq *MinimalRequest) Response {
+
+	response := Response{
+		MessageSize:   33, // Will be calculated properly in serialization
+		CorrelationID: minimalReq.CorrelationID,
+		ErrorCode:     0,
+		ArrayLength:   4, // 3 API versions + 1
+		APIVersions: []APIVersion{
+			{APIKey: 1, MinVersion: 0, MaxVersion: 17, TagBuffer: 0},
+			{APIKey: 18, MinVersion: 0, MaxVersion: 4, TagBuffer: 0},
+			{APIKey: 75, MinVersion: 0, MaxVersion: 0, TagBuffer: 0},
+		},
+		ThrottleTime: 0,
+		TagBuffer:    0,
+	}
+
 	// Create API func bytesToIntVersions response
 	if !(minimalReq.RequestAPIVersion >= 0 && minimalReq.RequestAPIVersion <= 4) {
 		response.ErrorCode = 35
 	}
+
+	return response
 }
 
 // Deserialize minimal request (always works for basic Kafka requests)
