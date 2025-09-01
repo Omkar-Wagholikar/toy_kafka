@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+
+	// "encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -14,6 +16,18 @@ import (
 // 00 12        // request_api_key:     18
 // 00 04        // request_api_version: 4
 // 6f 7f c6 61  // correlation_id:      1870644833
+type request struct {
+	message_size        int
+	request_api_key     int
+	request_api_version int
+	correlation_id      int
+}
+
+type response struct {
+	message_size   int
+	correlation_id int
+	error_code     int
+}
 
 func main() {
 	fmt.Println("Logs from your program will appear here!")
@@ -60,44 +74,55 @@ func handleConnection(conn net.Conn) {
 		received.Write(buff[:n])
 
 		fmt.Println()
-		mapping := deSerializeMessage(buff)
 
-		for key, value := range mapping {
-			fmt.Println(key, value)
-		}
+		req := deSerializeMessage(buff)
+
+		fmt.Println("message_size: ", req.message_size)
+		fmt.Println("request_api_key: ", req.request_api_key)
+		fmt.Println("request_api_version: ", req.request_api_version)
+		fmt.Println("correlation_id: ", req.correlation_id)
+
 		message_length := 0
 
-		response := serializeMessage(
+		res := response{
 			message_length,
-			mapping["correlation_id"],
-			4,
-			4,
-		)
+			req.correlation_id,
+			0,
+		}
 
-		conn.Write(response)
+		if !(req.request_api_version >= 0 && req.request_api_version <= 4) {
+			res.error_code = 35
+		}
+
+		res_bytes := serializeResponse(res)
+		fmt.Println(len(res_bytes))
+		conn.Write(res_bytes)
 	}
 }
 
-func serializeMessage(message_length int, correlation_id int, message_byte_len int, correlation_byte_len int) []byte {
-	return append(
-		intToBytes(message_length, message_byte_len),
-		intToBytes(correlation_id, correlation_byte_len)...,
-	)
+func serializeResponse(response response) []byte {
+	output := bytes.Buffer{}
+	binary.Write(&output, binary.LittleEndian, int32(response.message_size))
+	binary.Write(&output, binary.BigEndian, int32(response.correlation_id))
+	binary.Write(&output, binary.BigEndian, int16(response.error_code))
+	return output.Bytes()
 }
 
-func deSerializeMessage(buff []byte) map[string]int {
-	mapping := make(map[string]int)
-
-	mapping["message_size"] = bytesToInt(buff, 0, 4)
-	mapping["request_api_key"] = bytesToInt(buff, 4, 6)
-	mapping["request_api_version"] = bytesToInt(buff, 6, 8)
-	mapping["correlation_id"] = bytesToInt(buff, 8, 12)
-
-	return mapping
+func deSerializeMessage(buff []byte) request {
+	req := request{
+		bytesToInt(buff, 0, 4),
+		bytesToInt(buff, 4, 6),
+		bytesToInt(buff, 6, 8),
+		bytesToInt(buff, 8, 12),
+	}
+	return req
 }
 
 func bytesToInt(bs []byte, start int, end int) int {
 	valLen := end - start
+
+	// hexString := hex.EncodeToString(bs[start:end])
+	// fmt.Printf("> %s\n", hexString)
 
 	switch valLen {
 	case 1:
