@@ -2,52 +2,11 @@ package main
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
 	"os"
 )
-
-// Minimal request structure (always present)
-type MinimalRequest struct {
-	MessageSize       int
-	RequestAPIKey     int
-	RequestAPIVersion int
-	CorrelationID     int
-}
-
-// Full request structure with optional fields
-type FullRequest struct {
-	MinimalRequest
-	APIClientIDLength              int
-	APIClientIDContent             []byte
-	APITagBuffer                   int
-	ClientIDLength                 int
-	ClientIDContent                []byte
-	ClientSoftwareVersionLength    int
-	ClientSoftwareVersionContent   []byte
-	ClientSoftwareVersionTagBuffer int
-}
-
-// API Version entry for response
-type APIVersion struct {
-	APIKey     int
-	MinVersion int
-	MaxVersion int
-	TagBuffer  int
-}
-
-// Response structure
-type Response struct {
-	MessageSize   int
-	CorrelationID int
-	ErrorCode     int
-	ArrayLength   int
-	APIVersions   []APIVersion
-	ThrottleTime  int
-	TagBuffer     int
-}
 
 func main() {
 	fmt.Println("Logs from your program will appear here!")
@@ -89,7 +48,6 @@ func handleConnection(conn net.Conn) {
 
 		fmt.Println("Received bytes:", n)
 
-		// Try to deserialize as minimal request first
 		minimalReq, err := deserializeMinimalRequest(buff[:n])
 		if err != nil {
 			fmt.Println("Error deserializing minimal request:", err)
@@ -99,7 +57,6 @@ func handleConnection(conn net.Conn) {
 		fmt.Printf("Parsed request: APIKey=%d, Version=%d, CorrelationID=%d\n",
 			minimalReq.RequestAPIKey, minimalReq.RequestAPIVersion, minimalReq.CorrelationID)
 
-		// Create API Versions response
 		response := Response{
 			MessageSize:   33, // Will be calculated properly in serialization
 			CorrelationID: minimalReq.CorrelationID,
@@ -114,12 +71,28 @@ func handleConnection(conn net.Conn) {
 			TagBuffer:    0,
 		}
 
-		if !(minimalReq.RequestAPIVersion >= 0 && minimalReq.RequestAPIVersion <= 4) {
-			response.ErrorCode = 35
+		switch minimalReq.RequestAPIKey {
+		case ApiVersionAPIKEY:
+			handleAPIRequest(minimalReq, &response)
+		case DescribeTopicPartitionsAPIKEY:
+			handleDescribeRequest(minimalReq, &response)
+		default:
+			// response = handleDefaultRequest(minimalReq);
 		}
 
 		responseBytes := serializeResponse(response)
 		conn.Write(responseBytes)
+	}
+}
+
+func handleDescribeRequest(minimalReq *MinimalRequest, response *Response) {
+
+}
+
+func handleAPIRequest(minimalReq *MinimalRequest, response *Response) {
+	// Create API func bytesToIntVersions response
+	if !(minimalReq.RequestAPIVersion >= 0 && minimalReq.RequestAPIVersion <= 4) {
+		response.ErrorCode = 35
 	}
 }
 
@@ -214,48 +187,4 @@ func serializeResponse(resp Response) []byte {
 	buf.Write(messageContent.Bytes())
 
 	return buf.Bytes()
-}
-
-func bytesToInt(bs []byte, start int, end int) int {
-	valLen := end - start
-
-	switch valLen {
-	case 1:
-		return int(bs[start])
-	case 2:
-		return int(binary.BigEndian.Uint16(bs[start:end]))
-	case 4:
-		return int(binary.BigEndian.Uint32(bs[start:end]))
-	case 8:
-		return int(binary.BigEndian.Uint64(bs[start:end]))
-	default:
-		fmt.Println("CUSTOM LENGTH PASSED FOR BYTE 2 INT CONVERSION")
-		val := 0
-		for i := 0; i < valLen && i < 8; i++ {
-			val |= int(bs[start+i]) << ((valLen - 1 - i) * 8)
-		}
-		return val
-	}
-}
-
-func intToBytes(val int, val_byte_len int) []byte {
-	bs := make([]byte, val_byte_len)
-
-	switch val_byte_len {
-	case 1:
-		bs[0] = byte(val)
-	case 2:
-		binary.BigEndian.PutUint16(bs, uint16(val))
-	case 4:
-		binary.BigEndian.PutUint32(bs, uint32(val))
-	case 8:
-		binary.BigEndian.PutUint64(bs, uint64(val))
-	default:
-		fmt.Println("CUSTOM LENGTH PASSED FOR INT 2 BYTE CONVERSION")
-		for i := 0; i < val_byte_len && i < 8; i++ {
-			bs[i] = byte(val >> ((val_byte_len - 1 - i) * 8))
-		}
-	}
-
-	return bs
 }
