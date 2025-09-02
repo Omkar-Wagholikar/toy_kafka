@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bytes"
+	// "bytes"
 	"fmt"
 )
 
@@ -102,71 +102,68 @@ func deserializeDescribeTopicPartitionsRequest(buff []byte) (*DescribeTopicParti
 }
 
 func serializeDescribeTopicPartitionsResponse(resp *DescribeTopicPartitionsResponse) []byte {
-	var buf bytes.Buffer
+	var buf []byte
 
-	// Build message content first (excluding message size)
-	var messageContent bytes.Buffer
+	// Reserve 4 bytes for message size (we’ll patch later)
+	buf = append(buf, 0, 0, 0, 0)
 
-	// Correlation ID (4 bytes)
-	messageContent.Write(intToBytes(resp.CorrelationID, 4))
+	// Correlation ID (int32)
+	buf = append(buf, intToBytes(resp.CorrelationID, 4)...)
 
-	// Tag buffer (1 byte)
-	messageContent.WriteByte(byte(resp.TagBuffer))
+	// Top-level tag buffer (varint / 1 byte here since empty)
+	buf = append(buf, byte(0))
 
-	// Throttle time (4 bytes)
-	messageContent.Write(intToBytes(resp.ThrottleTime, 4))
+	// Throttle time (int32)
+	buf = append(buf, intToBytes(resp.ThrottleTime, 4)...)
 
-	// Topics array length (1 byte - compact array)
-	messageContent.WriteByte(byte(resp.TopicsArrayLength))
+	// Topics array length (compact array = len + 1)
+	buf = append(buf, byte(len(resp.Topics)+1))
 
 	// Topics
 	for _, topic := range resp.Topics {
-		// Error code (2 bytes)
-		messageContent.Write(intToBytes(topic.ErrorCode, 2))
+		// Error code (int16)
+		buf = append(buf, intToBytes(topic.ErrorCode, 2)...)
 
-		// Topic name length (1 byte - compact string)
-		messageContent.WriteByte(byte(topic.TopicNameLength))
+		// Topic name (compact string = length+1 + bytes)
+		buf = append(buf, byte(len(topic.TopicName)+1)) // topic name length + 1
+		buf = append(buf, topic.TopicName...)           // the actual topic name
 
-		// Topic name
-		messageContent.Write(topic.TopicName)
+		// Topic tag buffer
+		buf = append(buf, byte(0))
 
-		// Topic tag buffer (1 byte)
-		messageContent.WriteByte(byte(topic.TopicTagBuffer))
+		// Topic ID (16 bytes, all zeros here)
+		buf = append(buf, topic.TopicID[:]...)
 
-		// Topic ID (16 bytes)
-		messageContent.Write(topic.TopicID[:])
-
-		// Is internal (1 byte)
+		// IsInternal (boolean -> byte)
 		if topic.IsInternal {
-			messageContent.WriteByte(1)
+			buf = append(buf, byte(1))
 		} else {
-			messageContent.WriteByte(0)
+			buf = append(buf, byte(0))
 		}
 
-		// Partitions array (1 byte - compact array)
-		messageContent.WriteByte(byte(topic.PartitionsArray))
+		// Partitions array (compact array -> only header since empty)
+		buf = append(buf, byte(0))
 
-		// Topic auth ops (4 bytes)
-		messageContent.Write(intToBytes(topic.TopicAuthOps, 4))
+		// Topic authorized ops (int32)
+		// NOTE: spec default is 16777216 (0x01000000), not zero
+		buf = append(buf, intToBytes(16777216, 4)...)
 
-		// Response tag buffer (1 byte)
-		messageContent.WriteByte(byte(topic.ResponseTagBuffer))
+		// Response tag buffer
+		buf = append(buf, byte(0))
 	}
 
-	// Next cursor (1 byte)
-	messageContent.WriteByte(byte(resp.NextCursor))
+	// Next cursor (nullable compact struct -> 0x00 when null)
+	buf = append(buf, byte(0))
 
-	// Response tag buffer (1 byte)
-	messageContent.WriteByte(byte(resp.ResponseTagBuffer))
+	// Response tag buffer
+	buf = append(buf, byte(0))
 
-	// Calculate and write message size
-	actualMessageSize := messageContent.Len()
-	buf.Write(intToBytes(actualMessageSize, 4))
+	// Patch message size at start (total length - 4 bytes)
+	msgSize := len(buf) - 4
+	sizeBytes := intToBytes(msgSize, 4)
+	copy(buf[0:4], sizeBytes)
 
-	// Write message content
-	buf.Write(messageContent.Bytes())
-
-	return buf.Bytes()
+	return buf
 }
 
 func createUnknownTopicResponse(req *DescribeTopicPartitionsRequest) *DescribeTopicPartitionsResponse {
@@ -181,12 +178,17 @@ func createUnknownTopicResponse(req *DescribeTopicPartitionsRequest) *DescribeTo
 
 	// Create topic responses with unknown topic error
 	for _, reqTopic := range req.Topics {
+		var topicID [16]byte
+		for i := range topicID {
+			topicID[i] = 0x00
+		}
+
 		topicResp := TopicResponse{
 			ErrorCode:         ErrorCodeUnknownTopic,
 			TopicNameLength:   reqTopic.TopicNameLength,
 			TopicName:         reqTopic.TopicName,
 			TopicTagBuffer:    0,
-			TopicID:           [16]byte{}, // All zeros
+			TopicID:           topicID, // All zeros
 			IsInternal:        false,
 			PartitionsArray:   1, // Compact array with 0 partitions
 			TopicAuthOps:      0, // No authorized operations
@@ -196,4 +198,138 @@ func createUnknownTopicResponse(req *DescribeTopicPartitionsRequest) *DescribeTo
 	}
 
 	return resp
+}
+
+func deserializeDescribeTopicPartitionsResponse(buff []byte) (*DescribeTopicPartitionsResponse, error) {
+	if len(buff) < 4 {
+		return nil, fmt.Errorf("buffer too short for message size")
+	}
+
+	resp := &DescribeTopicPartitionsResponse{}
+	offset := 0
+
+	// Parse message size
+	resp.MessageSize = bytesToInt(buff, offset, offset+4)
+	offset += 4
+
+	if len(buff) < offset+4 {
+		return nil, fmt.Errorf("buffer too short for correlation ID")
+	}
+
+	// Parse correlation ID
+	resp.CorrelationID = bytesToInt(buff, offset, offset+4)
+	offset += 4
+
+	if len(buff) <= offset {
+		return nil, fmt.Errorf("buffer too short for tag buffer")
+	}
+
+	// Parse tag buffer
+	resp.TagBuffer = int(buff[offset])
+	offset++
+
+	if len(buff) < offset+4 {
+		return nil, fmt.Errorf("buffer too short for throttle time")
+	}
+
+	// Parse throttle time
+	resp.ThrottleTime = bytesToInt(buff, offset, offset+4)
+	offset += 4
+
+	if len(buff) <= offset {
+		return nil, fmt.Errorf("buffer too short for topics array length")
+	}
+
+	// Parse topics array length (compact array)
+	resp.TopicsArrayLength = int(buff[offset])
+	offset++
+
+	// Parse topics
+	topicsCount := resp.TopicsArrayLength - 1 // Compact array encoding
+	for i := 0; i < topicsCount; i++ {
+		topic := TopicResponse{}
+
+		// Error code (2 bytes)
+		if len(buff) < offset+2 {
+			return nil, fmt.Errorf("buffer too short for topic error code")
+		}
+		topic.ErrorCode = bytesToInt(buff, offset, offset+2)
+		offset += 2
+
+		// Topic name length (1 byte - compact string)
+		if len(buff) <= offset {
+			return nil, fmt.Errorf("buffer too short for topic name length")
+		}
+		topic.TopicNameLength = int(buff[offset])
+		offset++
+
+		// Topic name
+		nameLen := topic.TopicNameLength - 1 // Compact string encoding
+		if nameLen > 0 {
+			if len(buff) < offset+nameLen {
+				return nil, fmt.Errorf("buffer too short for topic name")
+			}
+			topic.TopicName = make([]byte, nameLen)
+			copy(topic.TopicName, buff[offset:offset+nameLen])
+			offset += nameLen
+		}
+
+		// Topic tag buffer (1 byte)
+		if len(buff) <= offset {
+			return nil, fmt.Errorf("buffer too short for topic tag buffer")
+		}
+		topic.TopicTagBuffer = int(buff[offset])
+		offset++
+
+		// Topic ID (16 bytes)
+		if len(buff) < offset+16 {
+			return nil, fmt.Errorf("buffer too short for topic ID")
+		}
+		copy(topic.TopicID[:], buff[offset:offset+16])
+		offset += 16
+
+		// Is internal (1 byte)
+		if len(buff) <= offset {
+			return nil, fmt.Errorf("buffer too short for is_internal")
+		}
+		topic.IsInternal = buff[offset] != 0
+		offset++
+
+		// Partitions array (1 byte - compact array)
+		if len(buff) <= offset {
+			return nil, fmt.Errorf("buffer too short for partitions array")
+		}
+		topic.PartitionsArray = int(buff[offset])
+		offset++
+
+		// Topic auth ops (4 bytes)
+		if len(buff) < offset+4 {
+			return nil, fmt.Errorf("buffer too short for topic auth ops")
+		}
+		topic.TopicAuthOps = bytesToInt(buff, offset, offset+4)
+		offset += 4
+
+		// Response tag buffer (1 byte)
+		if len(buff) <= offset {
+			return nil, fmt.Errorf("buffer too short for response tag buffer")
+		}
+		topic.ResponseTagBuffer = int(buff[offset])
+		offset++
+
+		resp.Topics = append(resp.Topics, topic)
+	}
+
+	// Parse next cursor (1 byte)
+	if len(buff) > offset {
+		resp.NextCursor = int(buff[offset])
+		offset++
+	}
+
+	// Parse response tag buffer (1 byte)
+	if len(buff) > offset {
+		resp.ResponseTagBuffer = int(buff[offset])
+		offset++
+	}
+
+	return resp, nil
 }

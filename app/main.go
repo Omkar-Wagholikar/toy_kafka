@@ -2,12 +2,20 @@ package main
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
 	"os"
 )
 
+// echo -n "00000031004b00000bcefe56000c6b61666b612d746573746572000212756e6b6e6f776e2d746f7069632d71757a0000000001ff00"  | xxd -r -p | nc localhost 9092 | hexdump -C
+
+//  My response: 000000380bcefe56000000000002000312756e6b6e6f776e2d746f7069632d71757a0000000000000000000000000000000000000001000000000000
+
+// (Ideally) correct response: 0000003d0bcefe56000000000002000312756e6b6e6f776e2d746f7069632d71757a00000000000000000000000000000000000001000000000001000000000000
+
+// echo -n "00000031004b00002a5d9747000c6b61666b612d746573746572000212756e6b6e6f776e2d746f7069632d70617a0000000001ff00" | xxd -r -p | nc localhost 9092 | hexdump -C
 // echo -n "00000020004b00000000000700096b61666b612d636c69000204666f6f0000000064ff00" | xxd -r -p | nc localhost 9092 | hexdump -C
 
 func main() {
@@ -23,7 +31,6 @@ func main() {
 
 	for {
 		conn, err := l.Accept()
-		fmt.Println("Accepted connection")
 		if err != nil {
 			fmt.Println("Error accepting connection: ", err.Error())
 			os.Exit(1)
@@ -33,7 +40,6 @@ func main() {
 }
 
 func handleConnection(conn net.Conn) {
-	fmt.Println("Handling connection")
 	defer conn.Close()
 
 	for {
@@ -48,8 +54,6 @@ func handleConnection(conn net.Conn) {
 			return
 		}
 
-		fmt.Println("Received bytes:", n)
-
 		minimalReq, err := deserializeMinimalRequest(buff[:n])
 		if err != nil {
 			fmt.Println("Error deserializing minimal request:", err)
@@ -59,10 +63,9 @@ func handleConnection(conn net.Conn) {
 		fmt.Printf("Parsed request: APIKey=%d, Version=%d, CorrelationID=%d\n",
 			minimalReq.RequestAPIKey, minimalReq.RequestAPIVersion, minimalReq.CorrelationID)
 
-		fmt.Printf("%d %d %d\n", minimalReq.RequestAPIKey, ApiVersionAPIKEY, DescribeTopicPartitionsAPIKEY)
-
 		switch minimalReq.RequestAPIKey {
 		case ApiVersionAPIKEY:
+			fmt.Println("ApiVersionAPIKEY")
 			response := handleAPIRequest(minimalReq)
 			responseBytes := serializeResponse(response)
 			conn.Write(responseBytes)
@@ -70,14 +73,24 @@ func handleConnection(conn net.Conn) {
 		case DescribeTopicPartitionsAPIKEY:
 			fmt.Println("DescribeTopicPartitionsAPIKEY")
 			response := handleDescribeRequest(buff, n)
+			printDescribeTopicResponse(response)
 			responseBytes := serializeDescribeTopicPartitionsResponse(response)
-			fmt.Printf("Sending response of %d bytes\n", len(responseBytes))
-			conn.Write(responseBytes)
+			data := hex.EncodeToString(responseBytes)
+			fmt.Println(">", data)
+			n, err = conn.Write(responseBytes)
+			if err != nil {
+				fmt.Println("Error in writing: ", err.Error())
+				os.Exit(1)
+			}
+			if n != len(responseBytes) {
+				fmt.Println("Improper write")
+			}
+			fmt.Println("PRINT COMPLETE")
 
 		default:
-			// response = handleDefaultRequest(minimalReq);
+			fmt.Println("UNHANDLED CASE")
+			os.Exit(1)
 		}
-
 	}
 }
 

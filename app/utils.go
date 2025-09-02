@@ -2,8 +2,55 @@ package main
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"net"
 )
+
+func printDescribeTopicResponse(response *DescribeTopicPartitionsResponse) {
+	fmt.Println("MessageSize: ", response.MessageSize)
+	fmt.Println("CorrelationID: ", response.CorrelationID)
+	fmt.Println("TagBuffer: ", response.TagBuffer)
+	fmt.Println("ThrottleTime: ", response.ThrottleTime)
+	fmt.Println("TopicsArrayLength: ", response.TopicsArrayLength)
+	for i, topic := range response.Topics {
+		fmt.Println("TOPIC: ", (i + 1))
+		fmt.Println("\tErrorCode: ", topic.ErrorCode)
+		fmt.Println("\tTopicNameLength: ", topic.TopicNameLength)
+		fmt.Println("\tTopicName: ", hex.EncodeToString(topic.TopicName))
+		fmt.Println("\tTopicTagBuffer: ", topic.TopicTagBuffer)
+		fmt.Println("\tTopicID: ", hex.EncodeToString(topic.TopicID[:]))
+		fmt.Println("\tIsInternal: ", topic.IsInternal)
+		fmt.Println("\tPartitionsArray: ", topic.PartitionsArray)
+		fmt.Println("\tTopicAuthOps: ", topic.TopicAuthOps)
+		fmt.Println("\tResponseTagBuffer: ", topic.ResponseTagBuffer)
+	}
+	fmt.Println("NextCursor: ", response.NextCursor)
+	fmt.Println("ResponseTagBuffer: ", response.ResponseTagBuffer)
+}
+
+func printDescribeTopicRequest(request *DescribeTopicPartitionsRequest) {
+
+	fmt.Println("MessageSize: ", request.MessageSize)
+	fmt.Println("RequestAPIKey: ", request.RequestAPIKey)
+	fmt.Println("RequestAPIVersion: ", request.RequestAPIVersion)
+	fmt.Println("CorrelationID: ", request.CorrelationID)
+	fmt.Println("TopicClientIDLength: ", request.TopicClientIDLength)
+	fmt.Println("TopicClientIDContent: ", hex.EncodeToString(request.TopicClientIDContent))
+	fmt.Println("TagBuffer: ", request.TagBuffer)
+	fmt.Println("TopicsArrayLength: ", request.TopicsArrayLength)
+
+	for i, topic := range request.Topics {
+		fmt.Println("\tTopic: ", (i + 1))
+		fmt.Println("\tTopicNameLength: ", topic.TopicNameLength)
+		fmt.Println("\tTopicName: ", hex.EncodeToString(topic.TopicName))
+		fmt.Println("\tTopicTagBuffer: ", topic.TopicTagBuffer)
+	}
+
+	fmt.Println("ResponsePartitionLimit: ", request.ResponsePartitionLimit)
+	fmt.Println("Cursor: ", request.Cursor)
+	fmt.Println("RequestTagBuffer: ", request.RequestTagBuffer)
+}
 
 func bytesToInt(bs []byte, start int, end int) int {
 	valLen := end - start
@@ -47,4 +94,16 @@ func intToBytes(val int, val_byte_len int) []byte {
 	}
 
 	return bs
+}
+
+func writeAll(conn net.Conn, data []byte) error {
+	total := 0
+	for total < len(data) {
+		n, err := conn.Write(data[total:])
+		if err != nil {
+			return err
+		}
+		total += n
+	}
+	return nil
 }
