@@ -2,6 +2,7 @@ package main
 
 import (
 	// "bytes"
+	"encoding/binary"
 	"fmt"
 )
 
@@ -141,22 +142,29 @@ func serializeDescribeTopicPartitionsResponse(resp *DescribeTopicPartitionsRespo
 			buf = append(buf, byte(0))
 		}
 
-		// Partitions array (compact array -> only header since empty)
+		// Partitions count (compact array -> only header since empty)
+		buf = append(buf, byte(0))
+
+		// Response tag buffer
 		buf = append(buf, byte(0))
 
 		// Topic authorized ops (int32)
 		// NOTE: spec default is 16777216 (0x01000000), not zero
-		buf = append(buf, intToBytes(16777216, 4)...)
+		buf = append(buf, intToBytes(0, 4)...)
 
-		// Response tag buffer
-		buf = append(buf, byte(0))
 	}
 
-	// Next cursor (nullable compact struct -> 0x00 when null)
-	buf = append(buf, byte(0))
+	// Write next_cursor as a valid empty COMPACT_STRING
+	buf = append(buf, 1) // length = 1 (VARINT)
+	buf = append(buf, 0) // tag buffer
 
-	// Response tag buffer
-	buf = append(buf, byte(0))
+	// Write partition_index (INT32, 4 bytes, usually 0)
+	partitionIndex := make([]byte, 4)
+	binary.BigEndian.PutUint32(partitionIndex, 0)
+	buf = append(buf, partitionIndex...)
+
+	// Write tag buffer after partition_index
+	buf = append(buf, 0)
 
 	// Patch message size at start (total length - 4 bytes)
 	msgSize := len(buf) - 4

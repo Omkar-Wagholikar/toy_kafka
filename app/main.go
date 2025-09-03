@@ -73,11 +73,14 @@ func handleConnection(conn net.Conn) {
 		case DescribeTopicPartitionsAPIKEY:
 			fmt.Println("DescribeTopicPartitionsAPIKEY")
 			response := handleDescribeRequest(buff, n)
-			printDescribeTopicResponse(response)
+			// printDescribeTopicResponse(response)
 			responseBytes := serializeDescribeTopicPartitionsResponse(response)
+
 			data := hex.EncodeToString(responseBytes)
 			fmt.Println(">", data)
+
 			n, err = conn.Write(responseBytes)
+
 			if err != nil {
 				fmt.Println("Error in writing: ", err.Error())
 				os.Exit(1)

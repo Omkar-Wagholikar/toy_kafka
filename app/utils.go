@@ -107,3 +107,24 @@ func writeAll(conn net.Conn, data []byte) error {
 	}
 	return nil
 }
+
+func encodeLength(l uint16) []byte {
+	out := make([]byte, 0)
+	if l == 0 {
+		out = append(out, 0)
+	} else {
+		for {
+			next := byte(l & 0x3f)
+			l = l >> 7
+			if l == 0 {
+				out = append(out, next)
+				break
+			} else {
+				next = next | 0x80
+				out = append(out, next)
+			}
+		}
+	}
+
+	return out
+}

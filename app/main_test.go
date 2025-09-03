@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"testing"
 	"time"
 )
@@ -28,6 +29,7 @@ func TestServerHandlesHardcodedRequest(t *testing.T) {
 	// Hardcoded request in hex
 	hexInput := "00000031004b00002a5d9747000c6b61666b612d746573746572000212756e6b6e6f776e2d746f7069632d70617a0000000001ff00"
 
+	expectedHexOutput := "0000003d2a5d9747000000000002000312756e6b6e6f776e2d746f7069632d70617a00000000000000000000000000000000000000000000000001000000000000"
 	// hexInput := "00000031004b000070d12963000c6b61666b612d746573746572000212756e6b6e6f776e2d746f7069632d73617a0000000001ff00"
 
 	data, err := hex.DecodeString(hexInput)
@@ -58,7 +60,8 @@ func TestServerHandlesHardcodedRequest(t *testing.T) {
 		t.Fatalf("Failed to read from server: %v", err)
 	}
 
-	t.Logf("\n\nResponse (hex): %s\n\n", hex.EncodeToString(buf[:n]))
+	actualHexOutput := hex.EncodeToString(buf[:n])
+	t.Logf("\n\nResponse (hex): %s\n\n", actualHexOutput)
 	val, err := deserializeDescribeTopicPartitionsResponse(buf[:n])
 
 	if err != nil {
@@ -68,5 +71,10 @@ func TestServerHandlesHardcodedRequest(t *testing.T) {
 		fmt.Println("RESPONSE >")
 		printDescribeTopicResponse(val)
 		fmt.Println()
+	}
+
+	if expectedHexOutput != actualHexOutput {
+		fmt.Println("FAILED TEST")
+		os.Exit(1)
 	}
 }
