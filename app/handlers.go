@@ -76,6 +76,7 @@ func handleDescribeRequest(buff []byte, n int) *DescribeTopicPartitionsResponse 
 	fmt.Printf("Parsed DescribeTopicPartitions request: CorrelationID=%d, Topics=%d\n",
 		req.CorrelationID, len(req.Topics))
 
+	// fmt.Println(global_metadata)
 	// Create response with unknown topic error
 	response := createUnknownTopicResponse(req)
 

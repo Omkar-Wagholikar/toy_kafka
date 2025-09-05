@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"toy_kafka/app/file_metadata"
 )
 
 func printDescribeTopicResponse(response *DescribeTopicPartitionsResponse) {
@@ -127,4 +128,17 @@ func encodeLength(l uint16) []byte {
 	}
 
 	return out
+}
+
+func FindTopicInGlobalMetadata(global_metadata file_metadata.ClusterMetaData, topic_name string) {
+	for _, batch := range global_metadata.Batches {
+		for _, record := range batch.Records {
+			if record.ValueType == 2 {
+				// Assert interface{} to TopicRecord
+				if topic, ok := record.Value.(file_metadata.TopicValue); ok {
+					fmt.Println(topic.TopicName)
+				}
+			}
+		}
+	}
 }
