@@ -18,9 +18,9 @@ func printDescribeTopicResponse(response *DescribeTopicPartitionsResponse) {
 		fmt.Println("TOPIC: ", (i + 1))
 		fmt.Println("\tErrorCode: ", topic.ErrorCode)
 		fmt.Println("\tTopicNameLength: ", topic.TopicNameLength)
-		fmt.Println("\tTopicName: ", hex.EncodeToString(topic.TopicName))
+		fmt.Println("\tTopicName: ", string(topic.TopicName))
 		fmt.Println("\tTopicTagBuffer: ", topic.TopicTagBuffer)
-		fmt.Println("\tTopicID: ", hex.EncodeToString(topic.TopicID[:]))
+		fmt.Println("\tTopicID: ", string(topic.TopicID[:]))
 		fmt.Println("\tIsInternal: ", topic.IsInternal)
 		fmt.Println("\tPartitionsArray: ", topic.PartitionsArray)
 		fmt.Println("\tTopicAuthOps: ", topic.TopicAuthOps)
@@ -37,7 +37,7 @@ func printDescribeTopicRequest(request *DescribeTopicPartitionsRequest) {
 	fmt.Println("RequestAPIVersion: ", request.RequestAPIVersion)
 	fmt.Println("CorrelationID: ", request.CorrelationID)
 	fmt.Println("TopicClientIDLength: ", request.TopicClientIDLength)
-	fmt.Println("TopicClientIDContent: ", hex.EncodeToString(request.TopicClientIDContent))
+	fmt.Println("TopicClientIDContent: ", string(request.TopicClientIDContent))
 	fmt.Println("TagBuffer: ", request.TagBuffer)
 	fmt.Println("TopicsArrayLength: ", request.TopicsArrayLength)
 
@@ -131,14 +131,15 @@ func encodeLength(l uint16) []byte {
 }
 
 func FindTopicInGlobalMetadata(global_metadata file_metadata.ClusterMetaData, topic_name string) {
+	fmt.Println("FindTopicInGlobalMetadata")
 	for _, batch := range global_metadata.Batches {
 		for _, record := range batch.Records {
 			if record.ValueType == 2 {
-				// Assert interface{} to TopicRecord
 				if topic, ok := record.Value.(file_metadata.TopicValue); ok {
 					fmt.Println(topic.TopicName)
 				}
 			}
 		}
 	}
+	fmt.Println("Complete FindTopicInGlobalMetadata")
 }

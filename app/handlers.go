@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -45,8 +44,9 @@ func handleConnection(conn net.Conn) {
 			// printDescribeTopicResponse(response)
 			responseBytes := serializeDescribeTopicPartitionsResponse(response)
 
-			data := hex.EncodeToString(responseBytes)
-			fmt.Println(">", data)
+			// data := hex.EncodeToString(responseBytes)
+			// fmt.Println(">", data)
+			printDescribeTopicResponse(response)
 
 			n, err = conn.Write(responseBytes)
 
@@ -76,7 +76,8 @@ func handleDescribeRequest(buff []byte, n int) *DescribeTopicPartitionsResponse 
 	fmt.Printf("Parsed DescribeTopicPartitions request: CorrelationID=%d, Topics=%d\n",
 		req.CorrelationID, len(req.Topics))
 
-	// fmt.Println(global_metadata)
+	fmt.Printf("TEST ITERATION OVER TOPICS\n\n")
+	FindTopicInGlobalMetadata(*global_metadata, string(req.TopicClientIDContent))
 	// Create response with unknown topic error
 	response := createUnknownTopicResponse(req)
 

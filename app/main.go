@@ -7,13 +7,13 @@ import (
 	"toy_kafka/app/file_metadata"
 )
 
-var global_metadata file_metadata.ClusterMetaData
+var global_metadata *file_metadata.ClusterMetaData
 
 func main() {
 	path := "/tmp/kraft-combined-logs/__cluster_metadata-0/00000000000000000000.log"
 	// file_metadata.CreateAndPopulateLog(path)
 	stream := file_metadata.ReadBin(path)
-	global_metadata, _ := file_metadata.CreateClusterMetaData(stream)
+	global_metadata, _ = file_metadata.CreateClusterMetaData(stream)
 	file_metadata.PrettyPrintClusterMetaData(*global_metadata)
 
 	fmt.Println("Logs from your program will appear here!")
