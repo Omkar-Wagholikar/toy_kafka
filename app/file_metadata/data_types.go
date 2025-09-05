@@ -3,7 +3,7 @@ package file_metadata
 import "github.com/google/uuid"
 
 type ClusterMetaData struct {
-	batches []RecordBatch
+	Batches []RecordBatch
 }
 
 type RecordBatch struct {
@@ -18,16 +18,16 @@ type RecordBatch struct {
 	producerId           int64
 	producerEpoch        int16
 	baseSequence         int32 // do we need this?
-	records              []Record
+	Records              []Record
 }
 
 type Record struct {
 	attributes     int8
 	timestampDelta int64
 	keySize        int64
-	valueType      int8
+	ValueType      int8
 	key            interface{} // variable sized integer?
-	value          interface{} // should be one of
+	Value          interface{} // should be one of
 }
 
 type ValueTypeHeader struct {
@@ -38,13 +38,13 @@ type ValueTypeHeader struct {
 
 type FeatureLevelValue struct {
 	header       ValueTypeHeader
-	name         string
+	Name         string
 	featureLevel int16
 }
 
 type TopicValue struct {
 	header    ValueTypeHeader
-	topicName string
+	TopicName string
 	topicId   uuid.UUID
 }
 

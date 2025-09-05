@@ -7,7 +7,7 @@ import (
 // PrettyPrintClusterMetaData prints a ClusterMetaData structure in a readable format.
 func PrettyPrintClusterMetaData(cm ClusterMetaData) {
 	fmt.Println("=== ClusterMetaData ===")
-	for i, batch := range cm.batches {
+	for i, batch := range cm.Batches {
 		fmt.Printf("Batch %d:\n", i)
 		fmt.Printf("  BaseOffset: %d\n", batch.baseOffset)
 		fmt.Printf("  PartitionLeaderEpoch: %d\n", batch.partitionLeaderEpoch)
@@ -21,14 +21,14 @@ func PrettyPrintClusterMetaData(cm ClusterMetaData) {
 		fmt.Printf("  ProducerEpoch: %d\n", batch.producerEpoch)
 		fmt.Printf("  BaseSequence: %d\n", batch.baseSequence)
 
-		for j, record := range batch.records {
+		for j, record := range batch.Records {
 			fmt.Printf("  Record %d:\n", j)
 			fmt.Printf("    Attributes: %d\n", record.attributes)
 			fmt.Printf("    TimestampDelta: %d\n", record.timestampDelta)
 			fmt.Printf("    KeySize: %d\n", record.keySize)
-			fmt.Printf("    ValueType: %d\n", record.valueType)
+			fmt.Printf("    ValueType: %d\n", record.ValueType)
 			fmt.Printf("    Key: %v\n", record.key)
-			fmt.Printf("    Value: %v\n", record.value)
+			fmt.Printf("    Value: %v\n", record.Value)
 		}
 	}
 }
