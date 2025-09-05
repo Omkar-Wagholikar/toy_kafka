@@ -2,7 +2,7 @@ set -e
 
 (
   cd "$(dirname "$0")"
-  go build -o /tmp/codecrafters-build-kafka-go app/*.go
+  go build -o /tmp/toy_kafka app/*.go
 )
 
-exec /tmp/codecrafters-build-kafka-go "$@"
+exec /tmp/toy_kafka "$@"

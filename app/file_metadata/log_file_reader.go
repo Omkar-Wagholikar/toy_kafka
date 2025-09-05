@@ -1,12 +1,11 @@
-package main
+package file_metadata
 
 import (
-	"encoding/hex"
 	"fmt"
 	"os"
 )
 
-func read_bin(path string) string {
+func ReadBin(path string) []byte {
 	file, err := os.Open(path)
 	if err != nil {
 		fmt.Println("File ops error: ", err.Error())
@@ -20,10 +19,11 @@ func read_bin(path string) string {
 			os.Exit(1)
 		} else {
 			buffer = buffer[:n]
-			file_str := hex.EncodeToString(buffer)
-			return file_str
+			return buffer
+			// file_str := hex.EncodeToString(buffer)
+			// return file_str
 		}
 	}
 	os.Exit(1)
-	return "error"
+	return nil
 }

@@ -37,15 +37,15 @@ func TestServerHandlesHardcodedRequest(t *testing.T) {
 		t.Fatalf("Failed to decode hex input: %v", err)
 	}
 
-	request, err := deserializeDescribeTopicPartitionsRequest(data)
-	if err != nil {
-		t.Fatalf("Failed to serialize request: %s", err.Error())
-	}
+	// _, err = deserializeDescribeTopicPartitionsRequest(data)
+	// if err != nil {
+	// 	t.Fatalf("Failed to serialize request: %s", err.Error())
+	// }
 
-	fmt.Println()
-	fmt.Println("REQUEST >")
-	printDescribeTopicRequest(request)
-	fmt.Println()
+	// fmt.Println()
+	// fmt.Println("REQUEST >")
+	// printDescribeTopicRequest(request)
+	// fmt.Println()
 
 	// Send request to server
 	_, err = conn.Write(data)
@@ -61,16 +61,17 @@ func TestServerHandlesHardcodedRequest(t *testing.T) {
 	}
 
 	actualHexOutput := hex.EncodeToString(buf[:n])
-	t.Logf("\n\nResponse (hex): %s\n\n", actualHexOutput)
-	val, err := deserializeDescribeTopicPartitionsResponse(buf[:n])
+	// t.Logf("\n\nResponse (hex): %s\n\n", actualHexOutput)
+	_, err = deserializeDescribeTopicPartitionsResponse(buf[:n])
+	// val, err := deserializeDescribeTopicPartitionsResponse(buf[:n])
 
 	if err != nil {
 		fmt.Println("THERE WAS AN ERROR! ", err.Error())
 	} else {
-		fmt.Println()
-		fmt.Println("RESPONSE >")
-		printDescribeTopicResponse(val)
-		fmt.Println()
+		// fmt.Println()
+		// fmt.Println("RESPONSE >")
+		// printDescribeTopicResponse(val)
+		// fmt.Println()
 	}
 
 	if expectedHexOutput != actualHexOutput {

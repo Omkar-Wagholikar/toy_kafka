@@ -2,6 +2,7 @@ package main
 
 import (
 	// "bytes"
+	"bytes"
 	"encoding/binary"
 	"fmt"
 )
@@ -340,4 +341,97 @@ func deserializeDescribeTopicPartitionsResponse(buff []byte) (*DescribeTopicPart
 	}
 
 	return resp, nil
+}
+
+// Serialize response
+func serializeResponse(resp Response) []byte {
+	var buf bytes.Buffer
+
+	// Calculate message size (excluding the message size field itself)
+	messageContent := bytes.Buffer{}
+
+	// Correlation ID (4 bytes)
+	messageContent.Write(intToBytes(resp.CorrelationID, 4))
+
+	// Error code (2 bytes)
+	messageContent.Write(intToBytes(resp.ErrorCode, 2))
+
+	// Array length (1 byte for compact array)
+	messageContent.WriteByte(byte(resp.ArrayLength))
+
+	// API Versions
+	for _, apiVer := range resp.APIVersions {
+		messageContent.Write(intToBytes(apiVer.APIKey, 2))
+		messageContent.Write(intToBytes(apiVer.MinVersion, 2))
+		messageContent.Write(intToBytes(apiVer.MaxVersion, 2))
+		messageContent.WriteByte(byte(apiVer.TagBuffer))
+	}
+
+	// Throttle time (4 bytes)
+	messageContent.Write(intToBytes(resp.ThrottleTime, 4))
+
+	// Tag buffer (1 byte)
+	messageContent.WriteByte(byte(resp.TagBuffer))
+
+	// Write actual message size
+	actualMessageSize := messageContent.Len()
+	buf.Write(intToBytes(actualMessageSize, 4))
+
+	// Write message content
+	buf.Write(messageContent.Bytes())
+
+	return buf.Bytes()
+}
+
+// Deserialize minimal request (always works for basic Kafka requests)
+func deserializeMinimalRequest(buff []byte) (*MinimalRequest, error) {
+	if len(buff) < 12 {
+		return nil, fmt.Errorf("buffer too short for minimal request")
+	}
+
+	req := &MinimalRequest{
+		MessageSize:       bytesToInt(buff, 0, 4),
+		RequestAPIKey:     bytesToInt(buff, 4, 6),
+		RequestAPIVersion: bytesToInt(buff, 6, 8),
+		CorrelationID:     bytesToInt(buff, 8, 12),
+	}
+
+	return req, nil
+}
+
+// Deserialize full request (handles variable length fields)
+func deserializeFullRequest(buff []byte) (*FullRequest, error) {
+	if len(buff) < 12 {
+		return nil, fmt.Errorf("buffer too short")
+	}
+
+	req := &FullRequest{}
+	req.MessageSize = bytesToInt(buff, 0, 4)
+	req.RequestAPIKey = bytesToInt(buff, 4, 6)
+	req.RequestAPIVersion = bytesToInt(buff, 6, 8)
+	req.CorrelationID = bytesToInt(buff, 8, 12)
+
+	offset := 12
+
+	// Check if we have more data for extended fields
+	if len(buff) <= offset {
+		return req, nil
+	}
+
+	// Parse API Client ID Length
+	if len(buff) >= offset+2 {
+		req.APIClientIDLength = bytesToInt(buff, offset, offset+2)
+		offset += 2
+
+		// Parse API Client ID Content
+		if len(buff) >= offset+req.APIClientIDLength {
+			req.APIClientIDContent = buff[offset : offset+req.APIClientIDLength]
+			offset += req.APIClientIDLength
+		}
+	}
+
+	// Parse remaining fields similarly...
+	// (Implementation depends on exact protocol requirements)
+
+	return req, nil
 }
