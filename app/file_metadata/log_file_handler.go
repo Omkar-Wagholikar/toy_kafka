@@ -239,7 +239,7 @@ func parseTopicValue(
 	return TopicValue{
 		header:    header,
 		TopicName: name,
-		topicId:   topicId,
+		TopicId:   topicId,
 	}, offset
 }
 

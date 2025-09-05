@@ -45,7 +45,7 @@ type FeatureLevelValue struct {
 type TopicValue struct {
 	header    ValueTypeHeader
 	TopicName string
-	topicId   uuid.UUID
+	TopicId   uuid.UUID
 }
 
 type PartitionValue struct {

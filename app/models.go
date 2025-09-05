@@ -33,7 +33,7 @@ type MinimalRequest struct {
 	MessageSize       int
 	RequestAPIKey     int
 	RequestAPIVersion int
-	CorrelationID     int
+	CorrelationID     int32
 }
 
 // Full request structure with optional fields
@@ -86,7 +86,7 @@ type FullRequest struct {
 // Response structure
 type Response struct {
 	MessageSize   int
-	CorrelationID int
+	CorrelationID int32
 	ErrorCode     int
 	ArrayLength   int
 	APIVersions   []APIVersion
@@ -126,7 +126,7 @@ type APIVersion struct {
 
 // Topic in the DescribeTopicPartitions request
 type TopicRequest struct {
-	TopicNameLength int
+	TopicNameLength int8
 	TopicName       []byte
 	TopicTagBuffer  int
 }
@@ -168,35 +168,64 @@ type DescribeTopicPartitionsRequest struct {
 // 00 00 00 00
 // 00 00 00 00
 // 00 			// is_internal (A boolean indicating whether the topic is internal)
-// 01			// partitions_array (A COMPACT_ARRAY of partitions for this topic, which contains the length + 1 encoded as a varint, followed by the contents.)
+// 03			// partitions_array_length (A COMPACT_ARRAY of partitions for this topic, which contains the length + 1 encoded as a varint, followed by the contents.)
+//	00 00	 	// Error code 00 means no error
+//	00 00 00 00	// Partition Index
+//	00 00 00 01 // leader id
+//  00 00 00 00 // leader epoch
+//  02 			// replica_node_length
+// 00 00 00 01  // replica_node A 4-byte integer representing a replica node ID
+// 02			// isr nodes length
+// 00 00 00 01  // A 4-byte integer representing an in-sync replica node ID.
+// 01			// eligible leader replica number
+// eligible leader replicas
+// LastKnownELR
+// offline replicas
+// 00 			// tag buffer
+// 00 00		// error code
+// 00 00 00 01	// Partition Index
+// ...
 // 00 00 00 00 	// topic_auth_ops 4 byte bit field to show authorized operations for this topic.
 // 00 			// tag buffer
 
 // 00 			// next_Cursor
 // 00 			// tag buffer
 
+type Partition struct {
+	ErrorCode              int16
+	PartitionIndex         int32
+	LeaderID               int32
+	LeaderEpoch            int32
+	ReplicaNodes           []int32
+	ISRNodes               []int32
+	EligibleLeaderReplicas []int32
+	LastKnownELR           []int32
+	OfflineReplicas        []int32
+	TaggedFields           int8
+}
+
 type TopicResponse struct {
-	ErrorCode         int
-	TopicNameLength   int
+	ErrorCode         int16
+	TopicNameLength   int8
 	TopicName         []byte
-	TopicTagBuffer    int
+	TopicTagBuffer    int8
 	TopicID           [16]byte // 16 bytes UUID
 	IsInternal        bool
-	PartitionsArray   int
-	TopicAuthOps      int // 4 byte bit field for authorized operations
-	ResponseTagBuffer int
+	PartitionsArray   []Partition
+	TopicAuthOps      int32 // 4 byte bit field for authorized operations
+	ResponseTagBuffer int8
 }
 
 // DescribeTopicPartitions Response (v0)
 type DescribeTopicPartitionsResponse struct {
-	MessageSize       int
-	CorrelationID     int
-	TagBuffer         int
-	ThrottleTime      int
-	TopicsArrayLength int
+	MessageSize       int32
+	CorrelationID     int32
+	TagBuffer         int8
+	ThrottleTime      int32
+	TopicsArrayLength int8
 	Topics            []TopicResponse
-	NextCursor        int
-	ResponseTagBuffer int
+	NextCursor        int8
+	ResponseTagBuffer int8
 }
 
 // Meaning of different codes in the topic_auth_ops

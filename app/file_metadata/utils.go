@@ -28,7 +28,11 @@ func PrettyPrintClusterMetaData(cm ClusterMetaData) {
 			fmt.Printf("    KeySize: %d\n", record.keySize)
 			fmt.Printf("    ValueType: %d\n", record.ValueType)
 			fmt.Printf("    Key: %v\n", record.key)
-			fmt.Printf("    Value: %v\n", record.Value)
+			if topic, ok := record.Value.(TopicValue); ok {
+				fmt.Printf("    Value: %v uuid: %s\n", topic.TopicName, topic.TopicId.String())
+			} else {
+				fmt.Printf("    Value: %v\n", record.Value)
+			}
 		}
 	}
 }

@@ -75,22 +75,59 @@ func bytesToInt(bs []byte, start int, end int) int {
 	}
 }
 
-func intToBytes(val int, val_byte_len int) []byte {
-	bs := make([]byte, val_byte_len)
+func int16ToBytes(val int16) []byte {
+	return []byte{byte(val >> 8), byte(val)}
+}
 
-	switch val_byte_len {
-	case 1:
-		bs[0] = byte(val)
-	case 2:
-		binary.BigEndian.PutUint16(bs, uint16(val))
-	case 4:
-		binary.BigEndian.PutUint32(bs, uint32(val))
-	case 8:
-		binary.BigEndian.PutUint64(bs, uint64(val))
+func int32ToBytes(val int32) []byte {
+	return []byte{byte(val >> 24), byte(val >> 16), byte(val >> 8), byte(val)}
+}
+
+// intToBytes converts various integer types to a byte slice of specified length
+func intToBytes(val interface{}, valByteLen int) []byte {
+	bs := make([]byte, valByteLen)
+	var v uint64
+
+	// Convert val to uint64 for unified processing
+	switch t := val.(type) {
+	case int:
+		v = uint64(t)
+	case int8:
+		v = uint64(t)
+	case int16:
+		v = uint64(t)
+	case int32:
+		v = uint64(t)
+	case int64:
+		v = uint64(t)
+	case uint:
+		v = uint64(t)
+	case uint8:
+		v = uint64(t)
+	case uint16:
+		v = uint64(t)
+	case uint32:
+		v = uint64(t)
+	case uint64:
+		v = t
 	default:
-		fmt.Println("CUSTOM LENGTH PASSED FOR INT 2 BYTE CONVERSION")
-		for i := 0; i < val_byte_len && i < 8; i++ {
-			bs[i] = byte(val >> ((val_byte_len - 1 - i) * 8))
+		panic(fmt.Sprintf("Unsupported type: %T", val))
+	}
+
+	switch valByteLen {
+	case 1:
+		bs[0] = byte(v)
+	case 2:
+		binary.BigEndian.PutUint16(bs, uint16(v))
+	case 4:
+		binary.BigEndian.PutUint32(bs, uint32(v))
+	case 8:
+		binary.BigEndian.PutUint64(bs, v)
+	default:
+		// Custom length: manually encode from most significant byte down
+		fmt.Println("CUSTOM LENGTH PASSED FOR INT TO BYTE CONVERSION")
+		for i := 0; i < valByteLen && i < 8; i++ {
+			bs[i] = byte(v >> ((valByteLen - 1 - i) * 8))
 		}
 	}
 
@@ -130,16 +167,31 @@ func encodeLength(l uint16) []byte {
 	return out
 }
 
-func FindTopicInGlobalMetadata(global_metadata file_metadata.ClusterMetaData, topic_name string) {
-	fmt.Println("FindTopicInGlobalMetadata")
+func bytesToInt16(buff []byte, start, end int) int16 {
+	if end-start == 2 {
+		return int16(buff[start])<<8 | int16(buff[start+1])
+	}
+	return 0
+}
+
+func bytesToInt32(buff []byte, start, end int) int32 {
+	if end-start == 4 {
+		return int32(buff[start])<<24 | int32(buff[start+1])<<16 | int32(buff[start+2])<<8 | int32(buff[start+3])
+	}
+	return 0
+}
+
+func FindTopicInGlobalMetadata(global_metadata file_metadata.ClusterMetaData, topic_name string) *file_metadata.TopicValue {
 	for _, batch := range global_metadata.Batches {
 		for _, record := range batch.Records {
 			if record.ValueType == 2 {
 				if topic, ok := record.Value.(file_metadata.TopicValue); ok {
-					fmt.Println(topic.TopicName)
+					if topic.TopicName == topic_name {
+						return &topic
+					}
 				}
 			}
 		}
 	}
-	fmt.Println("Complete FindTopicInGlobalMetadata")
+	return nil
 }

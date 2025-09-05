@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"toy_kafka/app/file_metadata"
 )
 
 func handleConnection(conn net.Conn) {
@@ -28,9 +29,6 @@ func handleConnection(conn net.Conn) {
 			continue
 		}
 
-		fmt.Printf("Parsed request: APIKey=%d, Version=%d, CorrelationID=%d\n",
-			minimalReq.RequestAPIKey, minimalReq.RequestAPIVersion, minimalReq.CorrelationID)
-
 		switch minimalReq.RequestAPIKey {
 		case ApiVersionAPIKEY:
 			fmt.Println("ApiVersionAPIKEY")
@@ -39,13 +37,12 @@ func handleConnection(conn net.Conn) {
 			conn.Write(responseBytes)
 
 		case DescribeTopicPartitionsAPIKEY:
-			fmt.Println("DescribeTopicPartitionsAPIKEY")
 			response := handleDescribeRequest(buff, n)
-			// printDescribeTopicResponse(response)
 			responseBytes := serializeDescribeTopicPartitionsResponse(response)
 
 			// data := hex.EncodeToString(responseBytes)
 			// fmt.Println(">", data)
+			fmt.Printf("\n\nRESPONSE\n\n")
 			printDescribeTopicResponse(response)
 
 			n, err = conn.Write(responseBytes)
@@ -68,18 +65,27 @@ func handleConnection(conn net.Conn) {
 
 func handleDescribeRequest(buff []byte, n int) *DescribeTopicPartitionsResponse {
 	req, err := deserializeDescribeTopicPartitionsRequest(buff[:n])
+	fmt.Printf("\nREQUEST\n\n")
+	printDescribeTopicRequest(req)
+
 	if err != nil {
 		fmt.Println("Error deserializing request:", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Parsed DescribeTopicPartitions request: CorrelationID=%d, Topics=%d\n",
-		req.CorrelationID, len(req.Topics))
-
-	fmt.Printf("TEST ITERATION OVER TOPICS\n\n")
-	FindTopicInGlobalMetadata(*global_metadata, string(req.TopicClientIDContent))
+	var found *file_metadata.TopicValue
+	for _, topic := range req.Topics {
+		found = FindTopicInGlobalMetadata(*global_metadata, string(topic.TopicName))
+		if found != nil {
+			break
+		}
+	}
 	// Create response with unknown topic error
 	response := createUnknownTopicResponse(req)
+	if found != nil {
+		response.Topics[0].ErrorCode = 0
+		response.Topics[0].TopicID = found.TopicId
+	}
 
 	return response
 }
